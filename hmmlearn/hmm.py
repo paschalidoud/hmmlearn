@@ -352,7 +352,7 @@ class MultinomialHMM(_BaseHMM):
     GaussianHMM : HMM with Gaussian emissions
     """
 
-    def __init__(self, n_components=1,
+    def __init__(self, n_components=1, n_features=None,
                  startprob_prior=1.0, transmat_prior=1.0,
                  algorithm="viterbi", random_state=None,
                  n_iter=10, thresh=1e-2, verbose=False,
@@ -364,6 +364,9 @@ class MultinomialHMM(_BaseHMM):
                           random_state=random_state,
                           n_iter=n_iter, thresh=thresh, verbose=verbose,
                           params=params, init_params=init_params)
+
+        if n_features is not None:
+            self.n_features = n_features
 
     def _compute_log_likelihood(self, X):
         return np.log(self.emissionprob_)[:, np.concatenate(X)].T
@@ -420,8 +423,8 @@ class MultinomialHMM(_BaseHMM):
     def _do_mstep(self, stats, params):
         super(MultinomialHMM, self)._do_mstep(stats, params)
         if 'e' in params:
-            self.emissionprob_ = (stats['obs']
-                                  / stats['obs'].sum(1)[:, np.newaxis])
+            self.emissionprob_ = stats['obs'] + 1.0/self.n_features
+            normalize(self.emissionprob_, axis=1)
 
     def _check_input_symbols(self, X):
         """Check if ``X`` is a sample from a Multinomial distribution.
@@ -439,8 +442,11 @@ class MultinomialHMM(_BaseHMM):
             (symbols < 0).any()):         # contains negative integers
             return False
 
-        symbols.sort()
-        return np.all(np.diff(symbols) <= 1)
+        if hasattr(self, "n_features"):
+            return np.max(symbols) < self.n_features
+        else:
+            symbols.sort()
+            return np.all(np.diff(symbols) <= 1)
 
 
 class GMMHMM(_BaseHMM):
